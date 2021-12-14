@@ -1,0 +1,119 @@
+---
+title: "coordinates_method"
+author: "William Medwid"
+date: "11/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+# revgeo method
+
+```{r}
+library(revgeo)
+library(tidyverse)
+```
+
+```{r}
+get_country <- function(x) {
+  
+  
+  lat = x[1]
+  long = x[2]
+  if(!is.na(lat)){
+    tryCatch({
+      return(revgeo(long, lat, provider =  'photon', output = 'frame')%>% pull("country"))
+    },
+    error = function(e) {
+      message("Error getting details - location most likely invalid")
+      return("NA")
+    })
+  }
+  else {
+    return("NA")
+  }
+}
+
+
+
+# test 
+# revgeo(longitude=-77.6036, latitude=42.1579	, output = 'frame') 
+```
+
+
+```{r coordinate_queries, cache=TRUE}
+protests_d <- protests_countries %>%
+  distinct()
+
+action_coords <- protests_d %>% 
+  mutate(lat = ActionGeoLat, long = ActionGeoLong) %>% 
+  select(lat, long) %>% 
+  distinct()
+
+source_coords <- protests_d %>% 
+  mutate(lat = SourceGeoLat, long = SourceGeoLong) %>% 
+  select(lat, long) %>% 
+  distinct()
+
+target_coords <- protests_d %>% 
+  mutate(lat = TargetGeoLat, long = TargetGeoLong) %>% 
+  select(lat, long) %>% 
+  distinct()
+
+full_coords <- action_coords %>% 
+  rbind(source_coords) %>% 
+  rbind(target_coords) %>% 
+  distinct()
+
+full_coords$country <- full_coords %>% 
+  select(lat, long) %>% 
+  apply(1, get_country)
+```
+
+```{r}
+# get_country <- function(x) {
+#   
+#   
+#   lat = x[1]
+#   long = x[2]
+#   if(!is.na(lat)){
+#     tryCatch({
+#       return(revgeo(long, lat, provider =  'google', output = 'frame')%>% pull("country"))
+#     },
+#     error = function(e) {
+#       message("Error getting details - location most likely invalid")
+#       return("NA")
+#     })
+#   }
+#   else {
+#     return("NA")
+#   }
+# }
+# 
+# none_found <- full_coords
+# 
+# none_found$country <- none_found %>% 
+#   select(lat, long) %>% 
+#   apply(1, get_country)
+```
+
+```{r}
+manual_coords <- read.csv("manual_country_coords.csv")
+
+
+full_and_manual_coords <- full_coords %>%
+  filter(!X %in% manual_coords$X) %>% 
+  union(manual_coords) %>% 
+  arrange(X)
+```
+
+```{r}
+write.csv(full_and_manual_coords, "coord_countries.csv")
+```
+
+

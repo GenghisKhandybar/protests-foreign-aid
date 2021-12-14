@@ -37,3 +37,11 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# Large Data Files
+GDELT_V1.csv
+manual_country_coords.csv
+protests_countries.csv
+protests_summarized.csv
+us_foreign_aid_country.csv
+foreign_aid.csv

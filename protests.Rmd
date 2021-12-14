@@ -1,0 +1,83 @@
+---
+title: "protests"
+author: "William Medwid"
+date: "11/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+protests <- readxl::read_xlsx("GDELT_V1.xlsx")
+#protests <- readxl::read_xlsx("HIST 326 Project Clean Data.xlsx")
+labels <- read.csv("labels.csv")
+```
+
+```{r}
+protests_countries <- protests %>% 
+  mutate(Date = ymd(Date), Year = lubridate::year(Date)) %>% # Adding Year Column
+  mutate(source_abbr = substr(Source, 1, 3),
+         target_abbr = substr(Target, 1, 3)) %>% 
+  left_join(labels, by = c("source_abbr" = "CODE")) %>% 
+  rename(country_source = LABEL) %>% 
+  left_join(labels, by = c("target_abbr" = "CODE")) %>% 
+  rename(country_target = LABEL) %>% 
+  # protestLat and protestLong represent the best and most complete coordinate for an event.
+  # Use action for coordinates, but if that isn't availiable, use source, then target coordinates.
+  mutate(protestLat = if_else(!is.na(ActionGeoLat), ActionGeoLat, if_else(!is.na(SourceGeoLat), SourceGeoLat, TargetGeoLat)),
+         protestLong = if_else(!is.na(ActionGeoLong), ActionGeoLong, if_else(!is.na(SourceGeoLong), SourceGeoLong, TargetGeoLong)))
+```
+
+
+```{r main_country}
+full_coords <- read.csv("coord_countries.csv")
+
+#Finding country labels for those not specified
+protests_no_country <- protests_countries %>% 
+  filter(is.na(country_source)) %>% 
+  left_join(full_coords, by = c("protestLat" = "lat", "protestLong" = "long")) %>% 
+  mutate(country = ifelse(country == "Country Not Found", NA, country)) %>% 
+  select(-X)
+
+# Remove entries where no country was found, then add the new dataframe with our best attempt at labeling them
+protests_countries_labeled_1 <- protests_countries %>% 
+  filter(!is.na(country_source)) %>% 
+  mutate(country = country_source) %>% 
+  union(protests_no_country)
+```
+
+```{r recieving_country}
+#Finding target country labels for those not specified
+protests_no_country <- protests_countries_labeled_1 %>% 
+  filter(is.na(country_target)) %>% 
+  left_join(full_coords %>% rename(country_recieving = country), by = c("TargetGeoLat" = "lat", "TargetGeoLong" = "long")) %>% 
+  mutate(country_recieving = ifelse(country_recieving == "Country Not Found", NA, country_recieving)) %>% 
+  select(-X)
+
+# Remove entries where no country was found, then add the new dataframe with our best attempt at labeling them
+protests_countries_labeled_2 <- protests_countries_labeled_1 %>% 
+  filter(!is.na(country_target)) %>% 
+  mutate(country_recieving = country_target) %>% 
+  union(protests_no_country) %>% 
+  select(-country_source, -country_target) %>% 
+  mutate(country_recieving = ifelse(is.na(country_recieving), country, country_recieving)) #If no target is found, label source country as target
+```
+
+
+```{r}
+protests_countries_labeled_2 %>% 
+  filter(country != country_recieving)
+```
+
+
+```{r}
+write.csv(protests_countries_labeled_2, "protests_countries.csv")
+```

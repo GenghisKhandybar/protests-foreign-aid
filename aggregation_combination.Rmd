@@ -1,0 +1,67 @@
+---
+title: "protest_foreign_years"
+author: "William Medwid"
+date: "11/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+protest_countries <- read.csv("protests_countries.csv") %>% 
+  mutate(Date = ymd(Date))
+```
+
+```{r}
+#Making foreign aid names align with protest names better
+foreign_aid <- read.csv("us_foreign_aid_country.csv") %>% 
+  filter(Region.Name != "World")
+
+foreign_aid_names_update <- read.csv("foreign_aid_name_adjustments.csv") %>% 
+  filter(!is.null(New.Name) && New.Name != "" && New.Name != " " )
+
+foreign_aid_fixed <- foreign_aid %>% 
+  left_join(foreign_aid_names_update, ON = c(Country.Name, Country.Name)) %>% 
+  mutate(Country.Name = ifelse(is.na(New.Name), Country.Name, New.Name)) %>% 
+  select(-X, -New.Name)
+
+write.csv(foreign_aid_fixed, "foreign_aid.csv")
+```
+
+```{r}
+protests_summarized <- protest_countries %>% 
+  mutate(Year = lubridate::year(Date)) %>% 
+  group_by(Year, country, country_recieving) %>% 
+  summarize(NumEventsYear = sum(NumEvents),
+            NumArtsTotal = sum(NumArts)) %>% 
+  mutate(country_target_simple = if_else(country == country_recieving, "Self", 
+                                         if_else(country_recieving == "United States", "United States", "Other"))) %>% 
+  filter(!is.na(country))
+
+write.csv(protests_summarized, "protests_summarized.csv")
+```
+
+```{r, run=FALSE}
+# Creating the base on which to manually add country names
+# Commented out because accidentally running this would delete manually created data.
+
+# fa_c <- foreign_aid %>% 
+#   distinct(Country.Name)
+# 
+# prot_c <- protests_full_countries %>% 
+#   select(country) %>% 
+#   distinct(country)
+# 
+# fa_c %>% 
+#   filter(!Country.Name %in% prot_c$country) %>% 
+#   write.csv("foreign_aid_name_adjustments.csv")
+```
+
